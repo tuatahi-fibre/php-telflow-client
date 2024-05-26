@@ -1,0 +1,10 @@
+{
+  "access_token": "someaccesstoken-Xh4m7oA",
+  "expires_in": 3600,
+  "refresh_expires_in": 4500,
+  "refresh_token": "a..refresh.token.might.be.here",
+  "token_type": "Bearer",
+  "not-before-policy": 0,
+  "session_state": "some.sesstion.state.1234",
+  "scope": "email profile"
+}

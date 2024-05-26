@@ -1,0 +1,9 @@
+<filter>
+    <whitelist>
+        <directory suffix=".php">./src</directory>
+        <exclude>
+            <directory suffix=".json">./tests/Responses</directory>
+            <file>./src/CurlRequest.php</file>
+        </exclude>
+    </whitelist>
+</filter>

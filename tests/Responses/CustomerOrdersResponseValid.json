@@ -1,0 +1,171 @@
+{
+  "customerOrders": [
+    {
+      "id": "ORDXXXXXXXXXXXX",
+      "creationDate": "2024-05-23T02:35:25.695318Z",
+      "lastModificationDate": "2024-05-23T02:35:25.700216Z",
+      "specifiedBy": {
+        "id": "XXX-ORD-CHG-BITSTREAM-XX-XX-XX",
+        "name": "Modify Bitstream 2 Ultra Order",
+        "version": "8.1",
+        "process": "TRP-LinearProcess5Stage-v1-99"
+      },
+      "interactionStatus": {
+        "id": "XXX00000000000X",
+        "name": "Acknowledged",
+        "type": "Start"
+      },
+      "orderDate": "2024-05-23T02:35:25.695318Z",
+      "relatedParty": [
+        {
+          "role": "CommerciallyResponsible",
+          "partyRole": {
+            "type": "Customer",
+            "party": {
+              "id": "PTY000000000XXX",
+              "status": "Active",
+              "organisationName": "AnOrg"
+            },
+            "contactMediums": [
+              {
+                "@type": "EmailContact",
+                "type": "Contact",
+                "emailAddress": "an.email.address@test.com"
+              }
+            ],
+            "status": "Active",
+            "billingAccountId": "AnOrg",
+            "defaultCpaId": " "
+          },
+          "id": "PTR000000000XXX",
+          "name": "AnOrg",
+          "@referredType": "Organisation"
+        },
+        {
+          "role": "Submitter",
+          "partyRole": {
+            "type": "ProviderAdministrator",
+            "party": {
+              "id": "PTY0000000XXXXX",
+              "lastModificationDate": "2023-03-08T01:04:51.930609",
+              "status": "Active",
+              "firstName": "Joe",
+              "lastName": "Bloggs"
+            },
+            "contactMediums": [
+              {
+                "@type": "EmailContact",
+                "type": "Contact",
+                "emailAddress": "joe.bloggs@test.com"
+              },
+              {
+                "@type": "LandlinePhoneNumber",
+                "type": "Contact",
+                "countryCode": "0800",
+                "areaCode": "XXX",
+                "number": "XXX"
+              },
+              {
+                "@type": "EmailContact",
+                "name": "Notification",
+                "type": "Notification",
+                "emailAddress": "joe.bloggs@test.com"
+              }
+            ],
+            "status": "Active"
+          },
+          "id": "PTR0000000XXXXX",
+          "name": "Joe Bloggs",
+          "@referredType": "Individual"
+        }
+      ],
+      "orderItem": [
+        {
+          "@type": "CustomerOrderItem",
+          "action": "Modify",
+          "quantity": "1",
+          "itemInvolvesLocations": [
+            {
+              "type": "ServiceAccessTo",
+              "id": "4000221XXXXXXXX"
+            }
+          ],
+          "businessInteractionItemRelationships": [
+            {
+              "relationshipType": "Parent",
+              "relationshipName": "Handover Connection Interface Group",
+              "specifiedBy": {
+                "id": "XXX-XXX000000000XXX-01",
+                "name": "Handover Connection Interface Group - Bitstream 2 Ultra",
+                "version": "8.1",
+                "permissions": [
+                  {
+                    "accessLevel": "ReadUpdate",
+                    "partyRoleTypes": [
+                      "Provider",
+                      "Customer",
+                      "System"
+                    ]
+                  },
+                  {
+                    "accessLevel": "NoAccess",
+                    "partyRoleTypes": [
+                      "ServiceDeliveryPartner"
+                    ]
+                  }
+                ]
+              },
+              "businessInteractionItem": {
+                "@type": "CustomerOrderItem",
+                "action": "Attach",
+                "quantity": "1",
+                "product": [
+                  {
+                    "id": "XXX00000XXXXXXX",
+                    "productSpecification": null,
+                    "productOffering": null
+                  }
+                ]
+              }
+            }
+          ],
+          "product": [
+            {
+              "id": "XXX00000XXXXXXX",
+              "productSpecification": {
+                "id": "XXX-PRD-BITSTREAM-XX-XX-XX",
+                "name": "Bitstream XXXX"
+              },
+              "headlineCharacteristics": "{\"Service Template\": \"Bitstream XXXX\"}",
+              "productOffering": {
+                "id": "XXX-OFF-BITSTREAM-XX-XX-XX",
+                "name": "Bitstream XXXX",
+                "version": "X.X",
+                "designStrategy": "None",
+                "pricingStrategy": "None"
+              },
+              "class": {
+                "id": "RSP-XX"
+              }
+            }
+          ]
+        }
+      ],
+      "priority": 50,
+      "orderCategory": null,
+      "@baseType": "Product",
+      "type": "Change",
+      "externalId": "t",
+      "category": "RSP-XX",
+      "@type": "CustomerOrder",
+      "state": "XXX00000000000X",
+      "_links": [
+        {
+          "rel": "self",
+          "href": "/v2/productOrder/XXX0000XXXXXXXX"
+        }
+      ],
+      "href": "/v2/productOrder/XXX0000XXXXXXXX"
+    }
+  ]
+}
