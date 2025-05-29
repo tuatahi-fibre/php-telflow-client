@@ -112,6 +112,10 @@ class TelflowClient
         return $this;
     }
 
+    /**
+     * @throws TelflowClientAuthException
+     * @throws TelflowClientException
+     */
     public function checkToken()
     {
         $cacheState = $this->cache->checkCache();
@@ -134,7 +138,7 @@ class TelflowClient
                         $this->cache->writeCache($enriched_token);
                         $this->token = $enriched_token;
                     }
-                } catch (TelflowClientException $e) {
+                } catch (TelflowClientAuthException $e) {
                     if ($e->status() == 400 && $e->message() == "Token is not active") {
                         // Refresh token might be expired.
                         // Try Full auth process.
@@ -149,10 +153,14 @@ class TelflowClient
                             print_r($response->body());
                             echo("\nSomething happened :(\n");
                         }
+                    } elseif ($e->status() == 401 && $e->message() == "Token is not active")
+                    {
+                        throw new TelflowClientAuthException($e->message(), $e->status());
                     }
                 }
             }
         } else {
+            try{
             // This is a request which needs full auth flow
             // maybe first ever request
             $response = $this->getAccessToken("auth");
@@ -160,6 +168,10 @@ class TelflowClient
                 $enriched_token = $this->enrichTokenData($response->body());
                 $this->cache->writeCache($enriched_token);
                 $this->token = $enriched_token;
+            }
+            } catch (TelflowClientException $e)
+            {
+                throw new TelflowClientAuthException($e->message(), $e->status());
             }
         }
     }
@@ -202,7 +214,7 @@ class TelflowClient
     /**
      * @param $type
      * @return TelflowHttpResponse
-     * @throws TelflowClientException
+     * @throws TelflowClientAuthException
      */
     private function getAccessToken($type)
     {
@@ -222,9 +234,9 @@ class TelflowClient
                 try {
                     return new TelflowHttpResponse($response_code, $content_type, $response);
                 } catch (TelflowClientException $e) {
-                    echo("An error occurred \n");
-                    print_r($e);
+                    throw new TelflowClientAuthException(json_decode($response)->error_description, $response_code);
                 }
+
             case "refresh":
                 // This is a refresh flow
                 $header = $this->createAuthHeader();
@@ -239,7 +251,7 @@ class TelflowClient
                 try {
                     return new TelflowHttpResponse($response_code, $content_type, $response);
                 } catch (TelflowClientException $e) {
-                    throw new TelflowClientException(json_decode($response)->error_description, $response_code);
+                    throw new TelflowClientAuthException(json_decode($response)->error_description, $response_code);
                 }
 
         }
@@ -252,7 +264,11 @@ class TelflowClient
     public function getPIID($order_no)
     {
         $parameters = ['id' => $order_no];
-        $headers = array("Accept-Language: en-US", "Cache-Control: max-age=0", "Connection: keep-alive", "Content-Type: application/json", "Authorization: Bearer " . $this->token->access_token);
+        $headers = array("Accept-Language: en-US",
+                         "Cache-Control: max-age=0",
+                         "Connection: keep-alive",
+                         "Content-Type: application/json",
+                         "Authorization: Bearer " . $this->token->access_token);
 
         $i = 1;
 
@@ -275,10 +291,17 @@ class TelflowClient
         }
 
         if ($response->status() == 200){
-            return new TelflowHttpResponse($response->status(),
-                // Just text as want to return string
-                "application/text",
-                $response->body()->customerOrders[0]->orderItem[0]->product[0]->id);
+            if (isset($response->body()->customerOrders[0]->orderItem[0]->product[0]->id)){
+                return new TelflowHttpResponse($response->status(),
+                    // Just text as want to return string
+                    "application/text",
+                    $response->body()->customerOrders[0]->orderItem[0]->product[0]->id);
+            } else {
+                return new TelflowHttpResponse(404,
+                                                'application/json',
+                                                       '{"error": "Not Found","error_description": "Unable to find PIID for input order"}');
+            }
+
         } else {
             return $response;
         }
