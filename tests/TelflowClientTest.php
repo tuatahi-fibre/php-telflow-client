@@ -3,6 +3,8 @@
 
 use Tuatahifibre\TelflowClient\TelflowClient;
 use Tuatahifibre\TelflowClient\HttpRequestInterface;
+use Tuatahifibre\TelflowClient\TelflowClientException;
+use Tuatahifibre\TelflowClient\TelflowClientAuthException;
 use Tuatahifibre\TelflowClient\FileCache;
 use PHPUnit\Framework\TestCase;
 
@@ -118,7 +120,7 @@ class TelflowClientTest extends TestCase
             ->checkToken();
     }
 
-    public function testAuthenticationRefreshFlowExpiredToken()
+    public function testAuthenticationRefreshFlowExpiredTokenSuccess()
     {
         // Update the cache to ensure refresh is triggered.
         $cached_details = $this->cache->checkCache();
@@ -146,13 +148,16 @@ class TelflowClientTest extends TestCase
             ->method('setOption')
             ->will($this->returnValue($mock));
 
+//        $this->expectException(TelflowClientAuthException::class);
+//        $this->expectExceptionCode(400);
+//        $this->expectExceptionMessage("Token is not active");
         // Setup Client
         $this->client->setUsername("some.api.user")
-            ->setPassword("some.user.password")
-            ->setClientId("a.client.id")
-            ->setClientSecret("som.client.secret")
-            ->setBaseUrl("https://some.website.address.co.nz")
-            ->checkToken();
+                ->setPassword("some.user.password")
+                ->setClientId("a.client.id")
+                ->setClientSecret("som.client.secret")
+                ->setBaseUrl("https://some.website.address.co.nz")
+                ->checkToken();
 
         // Delete cache file
         if (file_exists($this->cacheFile)) {
@@ -166,4 +171,41 @@ class TelflowClientTest extends TestCase
             unlink($cacheFile);
         }
     }
+
+    /**
+     * @throws TelflowClientAuthException
+     * @throws TelflowClientException
+     */
+    public function testAuthenticateIncorrectSecretRaisesException()
+    {
+        // Ensure the cachefile is no longer present.
+        if (file_exists($this->cacheFile)) {
+            unlink($this->cacheFile);
+        }
+        $mock = $this->createMock('Tuatahifibre\TelflowClient\HttpRequestInterface');
+        $mock->expects($this->once())
+            ->method('execute')
+            ->will($this->returnValue(file_get_contents(__DIR__ .
+                '/Responses/AuthenticationResponseInvalidClientSecret.json'))
+            );
+        $mock->expects($this->any())
+            ->method('setOption')
+            ->will($this->returnValue($mock));
+        $mock->expects($this->exactly(2))
+            ->method('getInfo')
+            ->willReturn($this->returnValue(401),
+                $this->returnValue('application/json'));
+
+        $this->client = new Tuatahifibre\TelflowClient\TelflowClient($mock);
+
+        $this->expectException(TelflowClientAuthException::class);
+
+        $this->client->setUsername("some.user")
+            ->setPassword("some.password")
+            ->setClientId("some.client.id")
+            ->setClientSecret("some.client.secret")
+            ->setBaseUrl("https://some.website.co.nz")
+            ->checkToken();
+    }
+
 }
