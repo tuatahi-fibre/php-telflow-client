@@ -260,6 +260,7 @@ class TelflowClient
     /**
      * @param $order_no
      * @return Exception|TelflowClientException|TelflowHttpResponse
+     * @throws TelflowClientException
      */
     public function getPIID($order_no)
     {

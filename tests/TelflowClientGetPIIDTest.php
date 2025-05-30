@@ -39,11 +39,11 @@ class TelflowClientGetPIIDTest extends TestCase
                 $this->returnValue(200),
                 $this->returnValue('application/json'));
         $this->client = new Tuatahifibre\TelflowClient\TelflowClient($mock, $this->cacheFile);
-        $this->client->setUsername("ApiSvc")
-            ->setPassword("ConnectAPI1!")
-            ->setClientId("uff-integration")
-            ->setClientSecret("1b715878-836b-45cc-99ca-bdb9e8a8012a")
-            ->setBaseUrl("https://portal-e2e.ultrafastfibre.co.nz")
+        $this->client->setUsername("some-api-user")
+            ->setPassword("a.password")
+            ->setClientId("client-id-goes-here")
+            ->setClientSecret("a-secret-shhhh")
+            ->setBaseUrl("https://some-base-url")
             ->checkToken();
 
         $piid = $this->client->getPIID("ORD000018196855");
