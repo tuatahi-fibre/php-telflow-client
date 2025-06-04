@@ -1,9 +1,8 @@
 <?php
-
 namespace Tuatahifibre\TelflowClient;
-
 use DateTime;
 use DateTimeZone;
+use Exception;
 
 class FileCache
 {
@@ -12,41 +11,76 @@ class FileCache
     public function __construct($cacheFile)
     {
         $this->cacheFile = $cacheFile;
+        
+        // Create cache directory if it doesn't exist
+        $dir = dirname($this->cacheFile);
+        if (!is_dir($dir)) {
+            if (!@mkdir($dir, 0755, true)) {
+                throw new Exception("Failed to create cache directory: " . $dir);
+            }
+
+        }
+
+        // Check directory permissions
+        if (!is_writable($dir)) {
+            throw new Exception("Cache directory is not writable: " . $dir);
+        }
     }
 
     public function writeCache($response)
     {
-        file_put_contents($this->cacheFile, json_encode($response, JSON_PRETTY_PRINT));
+        $result = file_put_contents($this->cacheFile, json_encode($response, JSON_PRETTY_PRINT));
+        if ($result === false) {
+            throw new Exception("Failed to write cache file: " . $this->cacheFile);
+        }
+        return $result;
     }
 
     public function checkCache()
-    {
-        if (@file_get_contents($this->cacheFile)) {
-            try {
-                $data = json_decode(file_get_contents($this->cacheFile));
-                if ($data->expires_at != "") {
-                    $now = new DateTime("", new DateTimeZone("Pacific/Auckland"));
-                    $expiry = new DateTime("$data->expires_at", new DateTimeZone("Pacific/Auckland"));
+{
+    // Check if file exists first
+    if (!file_exists($this->cacheFile)) {
+        return ['valid' => false, 'payload' => (object)[]];
+    }
 
-                    if ($now < $expiry) {
-                        // Still valid token ;)
-                        return ['valid' => true, 'payload' => $data];
+    $content = @file_get_contents($this->cacheFile);
+    if (empty($content)) {
+        return ['valid' => false, 'payload' => (object)[]];
+    }
 
-                    } elseif ($data->refresh_by <= $now) {
-                        // We have a refresh token.
-                        return ['valid' => false, 'payload' => $data];
-                    }
-    //                return ['valid' => false, 'payload' => ''];
+    try {
+        $data = json_decode($content);
+        // Check if JSON decode was successful
+        if (json_last_error() !== JSON_ERROR_NONE || $data === null) {
+            return ['valid' => false, 'payload' => (object)[]];
+        }
+
+        // Check if required properties exist
+        if (empty($data->expires_at)) {
+            return ['valid' => false, 'payload' => $data];
+        }
+
+        $now = new DateTime("now", new DateTimeZone("Pacific/Auckland"));
+        $expiry = new DateTime($data->expires_at, new DateTimeZone("Pacific/Auckland"));
+
+        if ($now < $expiry) {
+            // Still valid token
+            return ['valid' => true, 'payload' => $data];
+        } else {
+            // Token expired, but we might have a refresh token
+            if (isset($data->refresh_by)) {
+                $refreshExpiry = new DateTime($data->refresh_by, new DateTimeZone("Pacific/Auckland"));
+                if ($now <= $refreshExpiry) {
+                    // We have a valid refresh token
+                    return ['valid' => false, 'payload' => $data];
                 }
             }
-            catch (Exception $e)
-            {
-                echo "Caught exception: ", $e->getMessage(), "\n";
-            }
+            // Both tokens expired
+            return ['valid' => false, 'payload' => (object)[]];
         }
-        else {
-            return ['valid' => false, 'payload' => ''];
-        }
-
+    } catch (Exception $e) {
+        echo "Cache check exception: " . $e->getMessage() . "\n";
+        return ['valid' => false, 'payload' => (object)[]];
     }
+}
 }
