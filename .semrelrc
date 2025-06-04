@@ -1,7 +1,7 @@
 {
   "plugins": {
     "provider": {
-        "name": "gitea"
+        "name": "github"
     },
     "changelog-generator": {
         "name": "default",
