@@ -15,7 +15,7 @@ class TelflowClientGetPIIDTest extends TestCase
 
     public function testGetPIID()
     {
-        $this->cacheFile = sprintf("%s/api-cred-cache.json", getcwd());
+        $this->cacheFile = '/tmp/cache/api-creds.json';
         // Ensure the cachefile is no longer present.
         if (file_exists($this->cacheFile)) {
             unlink($this->cacheFile);
@@ -23,7 +23,7 @@ class TelflowClientGetPIIDTest extends TestCase
         $mock = $this->createMock('Tuatahifibre\TelflowClient\HttpRequestInterface');
         $mock->expects($this->exactly(2))
             ->method('execute')
-            ->willReturn($this->returnValue(file_get_contents(__DIR__ . '/Responses/AuthenticationResponseSuccess.json')),
+            ->willReturn($this->returnValue(file_get_contents(realpath(__DIR__ . '/Responses/AuthenticationResponseSuccess.json'))),
                 $this->returnValue(file_get_contents(__DIR__ . '/Responses/CustomerOrdersResponseValid.json'))
             );
         $mock->expects($this->any())

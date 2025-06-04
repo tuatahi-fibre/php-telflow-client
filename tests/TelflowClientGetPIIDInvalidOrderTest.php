@@ -15,7 +15,8 @@ class TelflowClientGetPIIDInvalidOrderTest extends TestCase
 
     public function testGetPIID()
     {
-        $this->cacheFile = sprintf("%s/api-cred-cache.json", getcwd());
+        $this->cacheFile = '/tmp/cache/api-creds.json';
+        #$this->cacheFile = sprintf("%s/api-cred-cache.json", getcwd());
         // Ensure the cachefile is no longer present.
         if (file_exists($this->cacheFile)) {
             unlink($this->cacheFile);
