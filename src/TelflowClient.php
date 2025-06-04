@@ -97,8 +97,9 @@ class TelflowClient
         $this->curl_handle = $curl_handle;
 
         if ($cacheFile == null) {
-            $this->cacheFile = sprintf("%s/api-cred-cache.json", getcwd());
-
+            // Use /tmp for CI environments, current directory for local
+            $cacheDir = getenv('CACHE_DIR') ?: getcwd();
+            $this->cacheFile = sprintf("%s/api-cred-cache.json", $cacheDir);
         } else {
             $this->cacheFile = $cacheFile;
         }
@@ -117,50 +118,48 @@ class TelflowClient
      * @throws TelflowClientException
      */
     public function checkToken()
-    {
-        $cacheState = $this->cache->checkCache();
-        if ($cacheState['valid']) {
-            // Token is still valid for Telflow access
-            $this->token = $cacheState['payload'];
-        } elseif ($cacheState['payload']->refresh_token != "") {
-            // Invalid or expired token
-            $payload = $cacheState['payload'];
-            // Check if we have a refresh token
-            if ($payload->refresh_token != "") {
-                $this->token = $cacheState['payload'];
-                // Request a new token by refresh flow
-                $response = false;
-                try {
-                    $response = $this->getAccessToken("refresh");
-                    if ($response->status() == 200) {
-                        // New token returned
-                        $enriched_token = $this->enrichTokenData($response->body());
-                        $this->cache->writeCache($enriched_token);
-                        $this->token = $enriched_token;
-                    }
-                } catch (TelflowClientAuthException $e) {
-                    if ($e->status() == 400 && $e->message() == "Token is not active") {
-                        // Refresh token might be expired.
-                        // Try Full auth process.
-                        $response = $this->getAccessToken("auth");
-
-                        if ($response->status() == 200) {
-                            $enriched_token = $this->enrichTokenData($response->body());
-                            $this->cache->writeCache($enriched_token);
-                            $this->token = $enriched_token;
-                        } else {
-                            echo($response->status() . "\n");
-                            print_r($response->body());
-                            echo("\nSomething happened :(\n");
-                        }
-                    } elseif ($e->status() == 401 && $e->message() == "Token is not active")
-                    {
-                        throw new TelflowClientAuthException($e->message(), $e->status());
-                    }
-                }
+{
+    $cacheState = $this->cache->checkCache();
+    if ($cacheState['valid']) {
+        // Token is still valid for Telflow access
+        $this->token = $cacheState['payload'];
+    } elseif (is_object($cacheState['payload']) && 
+              isset($cacheState['payload']->refresh_token) && 
+              !empty($cacheState['payload']->refresh_token)) {
+        // Invalid or expired token but has refresh token
+        $payload = $cacheState['payload'];
+        $this->token = $cacheState['payload'];
+        // Request a new token by refresh flow
+        $response = false;
+        try {
+            $response = $this->getAccessToken("refresh");
+            if ($response->status() == 200) {
+                // New token returned
+                $enriched_token = $this->enrichTokenData($response->body());
+                $this->cache->writeCache($enriched_token);
+                $this->token = $enriched_token;
             }
-        } else {
-            try{
+        } catch (TelflowClientAuthException $e) {
+            if ($e->status() == 400 && $e->message() == "Token is not active") {
+                // Refresh token might be expired.
+                // Try Full auth process.
+                $response = $this->getAccessToken("auth");
+
+                if ($response->status() == 200) {
+                    $enriched_token = $this->enrichTokenData($response->body());
+                    $this->cache->writeCache($enriched_token);
+                    $this->token = $enriched_token;
+                } else {
+                    echo($response->status() . "\n");
+                    print_r($response->body());
+                    echo("\nSomething happened :(\n");
+                }
+            } elseif ($e->status() == 401 && $e->message() == "Token is not active") {
+                throw new TelflowClientAuthException($e->message(), $e->status());
+            }
+        }
+    } else {
+        try {
             // This is a request which needs full auth flow
             // maybe first ever request
             $response = $this->getAccessToken("auth");
@@ -169,12 +168,11 @@ class TelflowClient
                 $this->cache->writeCache($enriched_token);
                 $this->token = $enriched_token;
             }
-            } catch (TelflowClientException $e)
-            {
-                throw new TelflowClientAuthException($e->message(), $e->status());
-            }
+        } catch (TelflowClientException $e) {
+            throw new TelflowClientAuthException($e->message(), $e->status());
         }
     }
+}
 
     private function buildUrl($endpoint, $needsApiVersion = false)
     {
