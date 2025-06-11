@@ -79,7 +79,6 @@ class FileCache
             return ['valid' => false, 'payload' => (object)[]];
         }
     } catch (Exception $e) {
-        echo "Cache check exception: " . $e->getMessage() . "\n";
         return ['valid' => false, 'payload' => (object)[]];
     }
 }
