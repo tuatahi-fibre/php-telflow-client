@@ -40,7 +40,7 @@ class TelflowClient
      * @param HttpRequestInterface|null $curl_handle Optional curl handle/mock
      * @param string|null $cacheFile Optional path to cache file
      */
-    public function __construct($curl_handle = null, $cacheFile = null) 
+    public function __construct($curl_handle = null, $cacheFile = null)
     {
         $this->curl_handle = $curl_handle;
         $this->cacheFile = $cacheFile;
@@ -84,9 +84,9 @@ class TelflowClient
         if (!$this->curl_handle instanceof HttpRequestInterface) {
             $this->curl_handle = new CurlRequest();
             $this->curl_handle->setMaxRetries($this->maxRetries)
-                             ->setRetryDelay($this->retryDelay);
+                ->setRetryDelay($this->retryDelay);
         }
-        
+
         return $this->curl_handle;
     }
 
@@ -105,7 +105,7 @@ class TelflowClient
                     $header = $this->createAuthHeader();
                     $c = $this->getCurlHandle();
                     $c->setUrl($this->buildUrl(self::TELFLOW_ACCESS_TOKEN_URL));
-                    
+
                     // Build form data with client credentials
                     $postData = http_build_query(array(
                         'grant_type' => 'password',
@@ -117,24 +117,24 @@ class TelflowClient
 
 
                     $c->setOption(CURLOPT_HTTPHEADER, $header)
-                      ->setOption(CURLOPT_RETURNTRANSFER, true)
-                      ->setOption(CURLOPT_POST, true)
-                      ->setOption(CURLOPT_POSTFIELDS, $postData);
+                        ->setOption(CURLOPT_RETURNTRANSFER, true)
+                        ->setOption(CURLOPT_POST, true)
+                        ->setOption(CURLOPT_POSTFIELDS, $postData);
 
                     $response = $c->execute();
                     $response_code = $c->getInfo(CURLINFO_RESPONSE_CODE);
                     $content_type = $c->getInfo(CURLINFO_CONTENT_TYPE);
-                    
+
                     $httpResponse = new TelflowHttpResponse($response_code, $content_type, $response);
-                    
+
                     // Store token data
                     if ($response_code === 200) {
                         $tokenData = $httpResponse->body();
-                        
+
                         // Update token cache
                         $this->updateTokenCache($tokenData);
                     }
-                    
+
                     return $httpResponse;
 
                 case "refresh":
@@ -146,9 +146,9 @@ class TelflowClient
                     $c = $this->getCurlHandle();
                     $c->setUrl($this->buildUrl(self::TELFLOW_ACCESS_TOKEN_URL));
                     $c->setOption(CURLOPT_HTTPHEADER, $header)
-                      ->setOption(CURLOPT_RETURNTRANSFER, true)
-                      ->setOption(CURLOPT_POST, true)
-                      ->setOption(CURLOPT_POSTFIELDS, "grant_type=refresh_token&refresh_token={$this->token->refresh_token}");
+                        ->setOption(CURLOPT_RETURNTRANSFER, true)
+                        ->setOption(CURLOPT_POST, true)
+                        ->setOption(CURLOPT_POSTFIELDS, "grant_type=refresh_token&refresh_token={$this->token->refresh_token}");
 
                     break;
 
@@ -160,14 +160,14 @@ class TelflowClient
                 $response = $c->execute();
                 $response_code = $c->getInfo(CURLINFO_RESPONSE_CODE);
                 $content_type = $c->getInfo(CURLINFO_CONTENT_TYPE);
-                
+
                 $httpResponse = new TelflowHttpResponse($response_code, $content_type, $response);
-                
+
                 // Update token cache if successful
                 if ($response_code === 200) {
                     $this->updateTokenCache($httpResponse->body());
                 }
-                
+
                 return $httpResponse;
 
             } catch (TelflowClientException $e) {
@@ -201,11 +201,12 @@ class TelflowClient
     private function updateTokenCache($token)
     {
         $this->token = $token;
-        
-        // Add expires_at timestamp
+
+        // Add expires_at timestamps
         if (isset($token->expires_in)) {
             $date = new DateTimeImmutable('now', new DateTimeZone('Pacific/Auckland'));
             $this->token->expires_at = $date->modify('+' . $token->expires_in . ' seconds')->format('Y-m-d H:i:s');
+            $this->token->refresh_expires_at = $date->modify('+' . ($token->refresh_expires_in) . ' seconds')->format('Y-m-d H:i:s');
         }
 
         // Update cache object
@@ -214,12 +215,12 @@ class TelflowClient
         // Write to cache file if path is set
         if (!empty($this->cacheFile)) {
             $cacheDir = dirname($this->cacheFile);
-            
+
             // Ensure cache directory exists
             if (!is_dir($cacheDir)) {
                 mkdir($cacheDir, 0755, true);
             }
-            
+
             // Write cache file
             if (file_put_contents($this->cacheFile, json_encode($this->token)) === false) {
                 error_log(sprintf("Failed to write cache file: %s", $this->cacheFile));
@@ -244,10 +245,14 @@ class TelflowClient
 
         if (isset($this->token->expires_at)) {
             $expires = new DateTimeImmutable($this->token->expires_at, new DateTimeZone('Pacific/Auckland'));
+            $refresh_expires = new DateTimeImmutable($this->token->refresh_expires_at, new DateTimeZone('Pacific/Auckland'));
             $now = new DateTimeImmutable('now', new DateTimeZone('Pacific/Auckland'));
-            
-            if ($expires <= $now) {
+
+            if ($expires <= $now && $refresh_expires < $now) {
                 $this->getAccessToken("refresh");
+            } else if ($expires <= $now) {
+                // If access_token is expired and refresh token is no longer valid, re-authenticate
+                $this->getAccessToken("auth");
             }
         }
     }
@@ -271,12 +276,12 @@ class TelflowClient
 
         $this->checkToken();
         $c = $this->getCurlHandle();
-        
+
         try {
             $c->setUrl($this->buildUrl(self::TELFLOW_ORDER_ENDPOINT, true) . "?" . http_build_query($parameters));
             $c->setOption(CURLOPT_HTTPHEADER, $headers)
-               ->setOption(CURLOPT_CUSTOMREQUEST, 'GET')
-               ->setOption(CURLOPT_RETURNTRANSFER, true);
+                ->setOption(CURLOPT_CUSTOMREQUEST, 'GET')
+                ->setOption(CURLOPT_RETURNTRANSFER, true);
 
             $response = $c->execute();
             $response_code = $c->getInfo(CURLINFO_RESPONSE_CODE);
@@ -341,7 +346,7 @@ class TelflowClient
      * @return string Full URL
      * @throws TelflowClientAuthException
      */
-    private function buildUrl($endpoint, $requiresAuth = false) 
+    private function buildUrl($endpoint, $requiresAuth = false)
     {
         if (empty($this->root_url)) {
             throw new TelflowClientAuthException('Base URL not set', 400);
@@ -354,7 +359,7 @@ class TelflowClient
         // Clean up URL parts and ensure proper prefixes
         $base = rtrim($this->root_url, '/');
         $path = ltrim($endpoint, '/');
-        
+
         $url = $base . '/' . $path;
 
         return $url;
