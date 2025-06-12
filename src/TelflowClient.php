@@ -90,6 +90,8 @@ class TelflowClient
         return $this->curl_handle;
     }
 
+
+
     /**
      * Get access token with retry support
      * @param string $type
@@ -129,10 +131,9 @@ class TelflowClient
 
                     // Store token data
                     if ($response_code === 200) {
-                        $tokenData = $httpResponse->body();
 
                         // Update token cache
-                        $this->updateTokenCache($tokenData);
+                        $this->updateTokenCache($httpResponse->body());
                     }
 
                     return $httpResponse;
@@ -150,6 +151,16 @@ class TelflowClient
                         ->setOption(CURLOPT_POST, true)
                         ->setOption(CURLOPT_POSTFIELDS, "grant_type=refresh_token&refresh_token={$this->token->refresh_token}");
 
+                    $response = $c->execute();
+                    $response_code = $c->getInfo(CURLINFO_RESPONSE_CODE);
+                    $content_type = $c->getInfo(CURLINFO_CONTENT_TYPE);
+
+                    $httpResponse = new TelflowHttpResponse($response_code, $content_type, $response);
+
+
+                    if ($response_code == 200) {
+                        $this->updateTokenCache($httpResponse->body());
+                    }
                     break;
 
                 default:
@@ -227,6 +238,7 @@ class TelflowClient
             }
         }
     }
+
 
     /**
      * Check if token needs refresh
