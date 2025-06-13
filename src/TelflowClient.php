@@ -45,12 +45,13 @@ class TelflowClient
         $this->curl_handle = $curl_handle;
         $this->cacheFile = $cacheFile;
 
-        if ($this->cacheFile && file_exists($this->cacheFile)) {
-            $contents = file_get_contents($this->cacheFile);
-            if ($contents !== false) {
-                $this->cache = json_decode($contents);
-            }
+        $this->cache = new FileCache($cacheFile);
+        // Check if cache file exists and is readable
+        $cacheObj = $this->cache->checkCache();
+        if ($cacheObj['valid']) {
+            $this->token = $cacheObj['payload'];
         }
+
     }
 
     /**
@@ -91,11 +92,20 @@ class TelflowClient
     }
 
 
+    private function updateTokenFromCache()
+    {
+        $cacheData = $this->cache->checkCache();
+        if ($cacheData['valid']) {
+            $this->token = $cacheData['payload'];
+        } else {
+            $this->token = null; // Reset token if cache is invalid
+        }
+    }
 
     /**
      * Get access token with retry support
      * @param string $type
-     * @return TelflowHttpResponse
+     * @return void
      * @throws TelflowClientAuthException
      */
     private function getAccessToken($type)
@@ -133,10 +143,11 @@ class TelflowClient
                     if ($response_code === 200) {
 
                         // Update token cache
-                        $this->updateTokenCache($httpResponse->body());
+                        $this->cache->writeCache($httpResponse->body());
+                        $this->updateTokenFromCache();
                     }
 
-                    return $httpResponse;
+                    return;
 
                 case "refresh":
                     if (!isset($this->token) || !isset($this->token->refresh_token)) {
@@ -149,7 +160,10 @@ class TelflowClient
                     $c->setOption(CURLOPT_HTTPHEADER, $header)
                         ->setOption(CURLOPT_RETURNTRANSFER, true)
                         ->setOption(CURLOPT_POST, true)
-                        ->setOption(CURLOPT_POSTFIELDS, "grant_type=refresh_token&refresh_token={$this->token->refresh_token}");
+                        ->setOption(CURLOPT_POSTFIELDS, "grant_type=refresh_token"
+                            . "&refresh_token=" . $this->token->refresh_token
+                            . "&client_id=" . $this->client_id
+                            . "&client_secret=" . $this->client_secret);
 
                     $response = $c->execute();
                     $response_code = $c->getInfo(CURLINFO_RESPONSE_CODE);
@@ -159,7 +173,8 @@ class TelflowClient
 
 
                     if ($response_code == 200) {
-                        $this->updateTokenCache($httpResponse->body());
+                        $this->cache->writeCache($httpResponse->body());
+                        $this->updateTokenFromCache();
                     }
                     break;
 
@@ -176,10 +191,11 @@ class TelflowClient
 
                 // Update token cache if successful
                 if ($response_code === 200) {
-                    $this->updateTokenCache($httpResponse->body());
+                    $this->cache->writeCache($httpResponse->body());
+                    $this->updateTokenFromCache();
                 }
 
-                return $httpResponse;
+                return;
 
             } catch (TelflowClientException $e) {
                 $error_desc = '';
@@ -205,40 +221,6 @@ class TelflowClient
         }
     }
 
-    /**
-     * Update token cache and write to file if configured
-     * @param object $token
-     */
-    private function updateTokenCache($token)
-    {
-        $this->token = $token;
-
-        // Add expires_at timestamps
-        if (isset($token->expires_in)) {
-            $date = new DateTimeImmutable('now', new DateTimeZone('Pacific/Auckland'));
-            $this->token->expires_at = $date->modify('+' . $token->expires_in . ' seconds')->format('Y-m-d H:i:s');
-            $this->token->refresh_expires_at = $date->modify('+' . ($token->refresh_expires_in) . ' seconds')->format('Y-m-d H:i:s');
-        }
-
-        // Update cache object
-        $this->cache = $this->token;
-
-        // Write to cache file if path is set
-        if (!empty($this->cacheFile)) {
-            $cacheDir = dirname($this->cacheFile);
-
-            // Ensure cache directory exists
-            if (!is_dir($cacheDir)) {
-                mkdir($cacheDir, 0755, true);
-            }
-
-            // Write cache file
-            if (file_put_contents($this->cacheFile, json_encode($this->token)) === false) {
-                error_log(sprintf("Failed to write cache file: %s", $this->cacheFile));
-            }
-        }
-    }
-
 
     /**
      * Check if token needs refresh
@@ -246,26 +228,26 @@ class TelflowClient
      */
     public function checkToken()
     {
-        if (!isset($this->token)) {
-            if (isset($this->cache)) {
-                $this->token = $this->cache;
-            } else {
-                $this->getAccessToken("auth");
-                return;
-            }
+        $dt = new DateTimeImmutable('now', new DateTimeZone('Pacific/Auckland'));
+        $cacheData = $this->cache->checkCache();
+        // Check if cache is valid
+        if ($cacheData['valid']) {
+            $this->token = $cacheData['payload'];
+        } else {
+            $this->token = null; // Reset token if cache is invalid
         }
 
-        if (isset($this->token->expires_at)) {
-            $expires = new DateTimeImmutable($this->token->expires_at, new DateTimeZone('Pacific/Auckland'));
-            $refresh_expires = new DateTimeImmutable($this->token->refresh_expires_at, new DateTimeZone('Pacific/Auckland'));
-            $now = new DateTimeImmutable('now', new DateTimeZone('Pacific/Auckland'));
-
-            if ($expires <= $now && $refresh_expires < $now) {
-                $this->getAccessToken("refresh");
-            } else if ($expires <= $now) {
-                // If access_token is expired and refresh token is no longer valid, re-authenticate
-                $this->getAccessToken("auth");
-            }
+        if ($this->token == null) {
+            // If no token is set, we need to authenticate
+            $this->getAccessToken("auth");
+        } elseif (new DateTimeImmutable($this->token->expires_at, new DateTimeZone('Pacific/Auckland')) <= $dt
+            && new DateTimeImmutable($this->token->refresh_expires_at, new DateTimeZone('Pacific/Auckland')) > $dt) {
+            // If token is expired but refresh token is still valid, refresh it
+            $this->getAccessToken("refresh");
+        } elseif (new DateTimeImmutable($this->token->expires_at, new DateTimeZone('Pacific/Auckland')) <= $dt
+            && new DateTimeImmutable($this->token->refresh_expires_at, new DateTimeZone('Pacific/Auckland')) <= $dt) {
+            // Tokens have expired, re-authentication needed
+            $this->getAccessToken("auth");
         }
     }
 
@@ -277,6 +259,8 @@ class TelflowClient
      */
     public function getPIID($order_no)
     {
+        $this->checkToken();
+
         $parameters = array('id' => $order_no);
         $headers = array(
             "Accept-Language: en-US",
@@ -286,7 +270,6 @@ class TelflowClient
             "Authorization: Bearer " . $this->token->access_token
         );
 
-        $this->checkToken();
         $c = $this->getCurlHandle();
 
         try {
@@ -316,8 +299,7 @@ class TelflowClient
             if ($response_code === 200 && $httpResponse != null) {
                 $body = $httpResponse->body();
                 if (!empty($body->customerOrders) &&
-                    isset($body->customerOrders[0]->orderItem[0]->product[0]->id))
-                {
+                    isset($body->customerOrders[0]->orderItem[0]->product[0]->id)) {
                     $httpResponse->setBody($body->customerOrders[0]->orderItem[0]->product[0]->id);
                     return $httpResponse;
                 }
